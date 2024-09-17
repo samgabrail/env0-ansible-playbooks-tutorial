@@ -51,7 +51,7 @@
   hosts: dbservers
   become: yes
   vars:
-    postgresql_version: "{{ postgresql_version | default('14.13') }}"
+    postgresql_version: "{{ postgresql_version | default('14') }}"
   tasks:
     - name: Install PostgreSQL
       apt:
@@ -73,7 +73,7 @@
 
     - name: Set PostgreSQL version
       set_fact:
-        postgresql_version: "{{ psql_version.stdout | regex_search('\\d+\\.\\d+') }}"
+        postgresql_version: "{{ psql_version.stdout | regex_search('\\d+') }}"
 
     - name: Configure PostgreSQL
       template:
