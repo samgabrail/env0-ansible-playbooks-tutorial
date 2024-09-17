@@ -1,0 +1,13 @@
+<VirtualHost *:80>
+    ServerName {{ domain }}
+    ServerAlias www.{{ domain }}
+    WSGIDaemonProcess {{ domain }} user=www-data group=www-data threads=5
+    WSGIScriptAlias / /var/www/{{ domain }}/app.wsgi
+
+    <Directory /var/www/{{ domain }}>
+        WSGIProcessGroup {{ domain }}
+        WSGIApplicationGroup %{GLOBAL}
+        Order deny,allow
+        Allow from all
+    </Directory>
+</VirtualHost>

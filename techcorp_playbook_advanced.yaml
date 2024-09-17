@@ -1,0 +1,164 @@
+---
+- name: Configure Web Servers
+  hosts: webservers
+  become: yes
+  vars:
+    domain: techcorp.com
+  tasks:
+    - name: Install required packages
+      apt:
+        name: 
+          - apache2
+          - libapache2-mod-wsgi-py3
+          - python3-pip
+          - python3-psycopg2
+        state: latest
+      notify:
+        - Restart Apache
+
+    - name: Install Flask
+      pip:
+        name: flask
+        state: latest
+
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: latest
+      notify:
+        - Restart Apache
+
+    - name: Ensure Apache is running
+      service:
+        name: apache2
+        state: started
+        enabled: true
+
+    - name: Deploy Apache config file
+      template:
+        src: templates/apache.conf.j2
+        dest: /etc/apache2/sites-available/{{ domain }}.conf
+
+    - name: Enable Apache site
+      command: a2ensite {{ domain }}.conf
+      notify:
+        - Reload Apache
+
+    - name: Create document root
+      file:
+        path: /var/www/{{ domain }}
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Copy Flask application
+      copy:
+        src: files/app.py
+        dest: /var/www/{{ domain }}/app.py
+
+    - name: Create templates directory
+      file:
+        path: /var/www/{{ domain }}/templates
+        state: directory
+
+    - name: Copy HTML template
+      template:
+        src: templates/index.html
+        dest: /var/www/{{ domain }}/templates/index.html
+
+    - name: Configure Apache to serve Flask app
+      template:
+        src: templates/apache_flask.conf.j2
+        dest: /etc/apache2/sites-available/{{ domain }}.conf
+      notify:
+        - Reload Apache
+
+  handlers:
+    - name: Reload Apache
+      service:
+        name: apache2
+        state: reloaded
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+
+- name: Configure Database Server
+  hosts: dbservers
+  become: yes
+  vars:
+    postgresql_version: "{{ postgresql_version | default('14') }}"
+  tasks:
+    - name: Install PostgreSQL
+      apt:
+        name: postgresql
+        state: latest
+      notify:
+        - Restart PostgreSQL
+
+    - name: Ensure PostgreSQL is running
+      service:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Get PostgreSQL version
+      command: psql --version
+      register: psql_version
+      changed_when: false
+
+    - name: Set PostgreSQL version
+      set_fact:
+        postgresql_version: "{{ psql_version.stdout | regex_search('\\d+') }}"
+
+    - name: Configure PostgreSQL
+      template:
+        src: templates/pg_hba.conf.j2
+        dest: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
+      notify:
+        - Reload PostgreSQL
+
+    - name: Create a new database
+      postgresql_db:
+        name: myapp
+      become: yes
+      become_user: postgres
+
+    - name: Create a new PostgreSQL user
+      postgresql_user:
+        name: myapp
+        password: myapppassword
+        db: myapp
+        priv: ALL
+      become: yes
+      become_user: postgres
+
+    - name: Create a sample table
+      postgresql_table:
+        db: myapp
+        name: items
+        columns:
+          - id serial primary key
+          - name varchar(100)
+      become: yes
+      become_user: postgres
+
+    - name: Insert sample data
+      postgresql_query:
+        db: myapp
+        query: INSERT INTO items (name) VALUES ('Item 1'), ('Item 2'), ('Item 3')
+      become: yes
+      become_user: postgres
+
+  handlers:
+    - name: Reload PostgreSQL
+      service:
+        name: postgresql
+        state: reloaded
+
+    - name: Restart PostgreSQL
+      service:
+        name: postgresql
+        state: restarted
