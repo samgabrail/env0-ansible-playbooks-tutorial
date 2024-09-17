@@ -102,7 +102,7 @@
       service:
         name: postgresql
         state: started
-        enabled: true
+        enabled: yes
 
     - name: Get PostgreSQL version
       command: psql --version
@@ -141,38 +141,49 @@
         group: postgres
         mode: '0775'
 
-    - name: Create a new database
-      postgresql_db:
-        name: myapp
+    - name: Check if database exists
       become: yes
       become_user: postgres
-      become_method: sudo
+      command: psql -tAc "SELECT 1 FROM pg_database WHERE datname='myapp'"
+      register: db_exists
+      changed_when: false
+
+    - name: Create a new database
+      become: yes
+      become_user: postgres
+      command: createdb myapp
+      when: db_exists.stdout == ""
 
     - name: Create a new PostgreSQL user
-      postgresql_user:
-        name: myapp
-        password: myapppassword
-        db: myapp
-        priv: ALL
       become: yes
       become_user: postgres
+      command: psql -c "CREATE USER myapp WITH PASSWORD 'myapppassword';"
+      register: user_created
+      changed_when: "'CREATE ROLE' in user_created.stdout"
+      failed_when: 
+        - "'ERROR' in user_created.stderr"
+        - "'already exists' not in user_created.stderr"
+
+    - name: Grant privileges to user
+      become: yes
+      become_user: postgres
+      command: psql -c "GRANT ALL PRIVILEGES ON DATABASE myapp TO myapp;"
+      when: user_created.changed
 
     - name: Create a sample table
-      postgresql_table:
-        db: myapp
-        name: items
-        columns:
-          - id serial primary key
-          - name varchar(100)
       become: yes
       become_user: postgres
+      command: psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
 
     - name: Insert sample data
-      postgresql_query:
-        db: myapp
-        query: INSERT INTO items (name) VALUES ('Item 1'), ('Item 2'), ('Item 3')
       become: yes
       become_user: postgres
+      command: psql -d myapp -c "INSERT INTO items (name) VALUES ('Item 1'), ('Item 2'), ('Item 3');"
+      register: insert_result
+      changed_when: "'INSERT 0 3' in insert_result.stdout"
+      failed_when:
+        - "'ERROR' in insert_result.stderr"
+        - "'duplicate key value violates unique constraint' not in insert_result.stderr"
 
   handlers:
     - name: Reload PostgreSQL
