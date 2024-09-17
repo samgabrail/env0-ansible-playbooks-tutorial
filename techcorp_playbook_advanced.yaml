@@ -102,7 +102,7 @@
       service:
         name: postgresql
         state: started
-        enabled: yes
+        enabled: true
 
     - name: Get PostgreSQL version
       command: psql --version
@@ -120,19 +120,55 @@
       notify:
         - Reload PostgreSQL
 
-    - name: Allow vagrant user to sudo as postgres
+    - name: Allow vagrant user to sudo as postgres without password
       lineinfile:
         path: /etc/sudoers
         state: present
         regexp: '^vagrant ALL=\(postgres\) NOPASSWD: ALL'
         line: 'vagrant ALL=(postgres) NOPASSWD: ALL'
         validate: 'visudo -cf %s'
+      become: yes
 
     - name: Add vagrant user to postgres group
       user:
         name: vagrant
         groups: postgres
         append: yes
+
+    - name: Ensure postgres group has necessary permissions
+      file:
+        path: /var/run/postgresql
+        state: directory
+        group: postgres
+        mode: '0775'
+
+    - name: Check if database exists
+      shell: sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='myapp'"
+      register: db_exists
+      changed_when: false
+
+    - name: Create a new database
+      shell: sudo -u postgres createdb myapp
+      when: db_exists.stdout == ""
+
+    - name: Check if user exists
+      shell: sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='myapp'"
+      register: user_exists
+      changed_when: false
+
+    - name: Create a new PostgreSQL user
+      shell: sudo -u postgres psql -c "CREATE USER myapp WITH PASSWORD 'myapppassword';"
+      when: user_exists.stdout == ""
+
+    - name: Grant privileges to user
+      shell: sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE myapp TO myapp;"
+      when: user_exists.stdout == ""
+
+    - name: Create a sample table
+      shell: sudo -u postgres psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
+
+    - name: Insert sample data
+      shell: sudo -u postgres psql -d myapp -c "INSERT INTO items (name) SELECT 'Item ' || generate_series(1,3) WHERE NOT EXISTS (SELECT 1 FROM items);"
 
     - name: Ensure postgres group has necessary permissions
       file:
