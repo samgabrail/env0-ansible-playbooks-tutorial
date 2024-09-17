@@ -50,6 +50,8 @@
 - name: Configure Database Server
   hosts: dbservers
   become: yes
+  vars:
+    postgresql_version: "{{ postgresql_version | default('14.13') }}"
   tasks:
     - name: Install PostgreSQL
       apt:
@@ -64,10 +66,19 @@
         state: started
         enabled: true
 
+    - name: Get PostgreSQL version
+      command: psql --version
+      register: psql_version
+      changed_when: false
+
+    - name: Set PostgreSQL version
+      set_fact:
+        postgresql_version: "{{ psql_version.stdout | regex_search('\\d+\\.\\d+') }}"
+
     - name: Configure PostgreSQL
       template:
         src: templates/pg_hba.conf.j2
-        dest: /etc/postgresql/12/main/pg_hba.conf
+        dest: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
       notify:
         - Reload PostgreSQL
 
