@@ -1,0 +1,83 @@
+---
+- name: Configure Web Servers
+  hosts: webservers
+  become: yes
+  vars:
+    domain: techcorp.com
+  tasks:
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: latest
+      notify:
+        - Restart Apache
+
+    - name: Ensure Apache is running
+      service:
+        name: apache2
+        state: started
+        enabled: true
+
+    - name: Deploy Apache config file
+      template:
+        src: templates/apache.conf.j2
+        dest: /etc/apache2/sites-available/{{ domain }}.conf
+
+    - name: Enable Apache site
+      command: a2ensite {{ domain }}.conf
+      notify:
+        - Reload Apache
+
+    - name: Create document root
+      file:
+        path: /var/www/{{ domain }}
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+  handlers:
+    - name: Reload Apache
+      service:
+        name: apache2
+        state: reloaded
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+
+- name: Configure Database Server
+  hosts: dbservers
+  become: yes
+  tasks:
+    - name: Install PostgreSQL
+      apt:
+        name: postgresql
+        state: latest
+      notify:
+        - Restart PostgreSQL
+
+    - name: Ensure PostgreSQL is running
+      service:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Configure PostgreSQL
+      template:
+        src: templates/pg_hba.conf.j2
+        dest: /etc/postgresql/12/main/pg_hba.conf
+      notify:
+        - Reload PostgreSQL
+
+  handlers:
+    - name: Reload PostgreSQL
+      service:
+        name: postgresql
+        state: reloaded
+
+    - name: Restart PostgreSQL
+      service:
+        name: postgresql
+        state: restarted

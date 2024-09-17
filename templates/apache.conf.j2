@@ -1,0 +1,13 @@
+<VirtualHost *:80>
+    ServerName {{ domain }}
+    ServerAlias www.{{ domain }}
+    DocumentRoot /var/www/{{ domain }}
+
+    <Directory /var/www/{{ domain }}>
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/{{ domain }}_error.log
+    CustomLog ${APACHE_LOG_DIR}/{{ domain }}_access.log combined
+</VirtualHost>

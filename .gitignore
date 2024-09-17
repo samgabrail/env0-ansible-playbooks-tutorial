@@ -37,3 +37,4 @@ override.tf.json
 terraform.rc
 
 .vagrant
+control_node_key.pub

@@ -12,3 +12,6 @@ This will create 4 VMs:
 - 2 webservers
 - 1 database server
 
+To access the VMs, use `vagrant ssh controlnode`, `vagrant ssh webserver1`, `vagrant ssh webserver2`, and `vagrant ssh dbserver`
+
+To ssh into the VMs from the control node, use `ssh-copy-id -i ~/.ssh/id_rsa.pub vagrant@<ip>`
