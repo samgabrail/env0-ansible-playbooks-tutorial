@@ -63,7 +63,7 @@
         state: directory
 
     - name: Copy HTML template
-      template:
+      copy:
         src: templates/index.html
         dest: /var/www/{{ domain }}/templates/index.html
 
@@ -120,11 +120,33 @@
       notify:
         - Reload PostgreSQL
 
+    - name: Allow vagrant user to sudo as postgres
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^vagrant ALL=\(postgres\) NOPASSWD: ALL'
+        line: 'vagrant ALL=(postgres) NOPASSWD: ALL'
+        validate: 'visudo -cf %s'
+
+    - name: Add vagrant user to postgres group
+      user:
+        name: vagrant
+        groups: postgres
+        append: yes
+
+    - name: Ensure postgres group has necessary permissions
+      file:
+        path: /var/run/postgresql
+        state: directory
+        group: postgres
+        mode: '0775'
+
     - name: Create a new database
       postgresql_db:
         name: myapp
       become: yes
       become_user: postgres
+      become_method: sudo
 
     - name: Create a new PostgreSQL user
       postgresql_user:
