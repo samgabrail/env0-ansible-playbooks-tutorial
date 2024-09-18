@@ -23,57 +23,6 @@
         src: templates/apache.conf.j2
         dest: /etc/apache2/sites-available/{{ domain }}.conf
 
-    - name: Enable Apache site
-      command: a2ensite {{ domain }}.conf
-      notify:
-        - Reload Apache
-
-    - name: Create document root
-      file:
-        path: /var/www/{{ domain }}
-        state: directory
-        owner: www-data
-        group: www-data
-        mode: '0755'
-
-    - name: Copy Flask application
-      copy:
-        src: files/app.py
-        dest: /var/www/{{ domain }}/app.py
-      notify: Restart Apache
-
-    - name: Create WSGI file
-      copy:
-        content: |
-          import sys
-          sys.path.insert(0, '/var/www/{{ domain }}')
-          from app import app as application
-        dest: /var/www/{{ domain }}/app.wsgi
-      notify: Restart Apache
-
-    - name: Restart Apache
-      service:
-        name: apache2
-        state: restarted
-
-    - name: Wait for Apache to start
-      wait_for:
-        port: 80
-        delay: 10
-        timeout: 30
-
-    - name: Fetch webpage content
-      uri:
-        url: "http://localhost"
-        return_content: yes
-      register: webpage
-      ignore_errors: yes
-
-    - name: Display webpage content
-      debug:
-        var: webpage.content
-      tags: test_flask
-
   handlers:
     - name: Reload Apache
       service:
@@ -89,29 +38,20 @@
   hosts: dbservers
   become: yes
   vars:
-    postgresql_version: "{{ postgresql_version | default('14') }}"
+    postgresql_version: "14"  # Set a default version
+
   tasks:
     - name: Install PostgreSQL
       apt:
         name: postgresql
-        state: latest
-      notify:
-        - Restart PostgreSQL
+        state: present
+        update_cache: yes
 
     - name: Ensure PostgreSQL is running
       service:
         name: postgresql
         state: started
         enabled: true
-
-    - name: Get PostgreSQL version
-      command: psql --version
-      register: psql_version
-      changed_when: false
-
-    - name: Set PostgreSQL version
-      set_fact:
-        postgresql_version: "{{ psql_version.stdout | regex_search('\\d+') }}"
 
     - name: Configure PostgreSQL
       template:
@@ -125,8 +65,3 @@
       service:
         name: postgresql
         state: reloaded
-
-    - name: Restart PostgreSQL
-      service:
-        name: postgresql
-        state: restarted

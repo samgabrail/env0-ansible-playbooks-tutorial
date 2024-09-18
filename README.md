@@ -16,5 +16,5 @@ To access the VMs, use `vagrant ssh controlnode`, `vagrant ssh webserver1`, `vag
 
 ## Run the playbook
 
-Run the playbook with `ansible-playbook -i inventory techcorp_playbook_advanced.yaml`
+Run the playbook with `ansible-playbook -i inventory techcorp_playbook.yaml`
 
