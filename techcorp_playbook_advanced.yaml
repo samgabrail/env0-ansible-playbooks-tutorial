@@ -1,13 +1,12 @@
----
 - name: Configure Web Servers
   hosts: webservers
-  become: yes
+  become: 'yes'
   vars:
     domain: techcorp.com
   tasks:
     - name: Install required packages
       apt:
-        name: 
+        name:
           - apache2
           - libapache2-mod-wsgi-py3
           - python3-pip
@@ -36,7 +35,7 @@
 
     - name: Create Apache configuration file for techcorp.com
       template:
-        src: templates/apache_site.conf.j2
+        src: templates/apache_flask.conf.j2
         dest: /etc/apache2/sites-available/techcorp.com.conf
       notify: Reload Apache
 
@@ -124,7 +123,7 @@
 
 - name: Configure Database Server
   hosts: dbservers
-  become: yes
+  become: 'yes'
   vars:
     postgresql_version: 14
   tasks:
@@ -135,21 +134,21 @@
 
     - name: Ensure PostgreSQL is listening on all interfaces
       lineinfile:
-        path: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
-        regexp: '^listen_addresses\s*='
-        line: "listen_addresses = '*'"
+        path: /etc/postgresql/{{ postgresql_version }}/main/postgresql.conf
+        regexp: ^listen_addresses\s*=
+        line: listen_addresses = '*'
       notify: Restart PostgreSQL
 
     - name: Ensure PostgreSQL is started and enabled
       systemd:
         name: postgresql
         state: started
-        enabled: yes
+        enabled: 'yes'
 
     - name: Configure PostgreSQL
       template:
         src: templates/pg_hba.conf.j2
-        dest: "/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf"
+        dest: /etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf
       notify:
         - Reload PostgreSQL
 
@@ -159,7 +158,7 @@
         state: present
         regexp: '^vagrant ALL=\(postgres\) NOPASSWD: ALL'
         line: 'vagrant ALL=(postgres) NOPASSWD: ALL'
-        validate: 'visudo -cf %s'
+        validate: visudo -cf %s
 
     - name: Ensure postgres group has necessary permissions
       file:
@@ -169,7 +168,8 @@
         mode: '0775'
 
     - name: Check if database exists
-      command: sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='myapp'"
+      command: sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE
+        datname='myapp'"
       register: db_exists
       changed_when: false
 
@@ -183,28 +183,26 @@
       changed_when: false
 
     - name: Create a new PostgreSQL user
-      command: sudo -u postgres psql -c "CREATE USER myapp WITH PASSWORD 'myapppassword';"
+      command: sudo -u postgres psql -c "CREATE USER myapp WITH PASSWORD
+        'myapppassword';"
       when: user_exists.stdout == ""
 
     - name: Create a sample table
-      command: sudo -u postgres psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
+      command: sudo -u postgres psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id
+        serial primary key, name varchar(100));"
 
     - name: Add unique constraint to name column
-      command: >
-        sudo -u postgres psql -d myapp -c "
-        ALTER TABLE items ADD CONSTRAINT items_name_key UNIQUE (name);"
+      command: |
+        sudo -u postgres psql -d myapp -c " ALTER TABLE items ADD CONSTRAINT items_name_key UNIQUE (name);"
       register: alter_table
       changed_when: alter_table.rc == 0
-      failed_when: 
+      failed_when:
         - alter_table.rc != 0
-        - "'already exists' not in alter_table.stderr"
+        - '''already exists'' not in alter_table.stderr'
 
     - name: Insert sample data
-      command: >
-        sudo -u postgres psql -d myapp -c "
-        INSERT INTO items (name)
-        VALUES ('Computers'), ('iPads'), ('iPhones'), ('Android Phones')
-        ON CONFLICT (name) DO NOTHING;"
+      command: |
+        sudo -u postgres psql -d myapp -c " INSERT INTO items (name) VALUES ('Computers'), ('iPads'), ('iPhones'), ('Android Phones') ON CONFLICT (name) DO NOTHING;"
 
     - name: Verify inserted data
       command: sudo -u postgres psql -d myapp -c "SELECT * FROM items;"
@@ -214,7 +212,7 @@
     - name: Display inserted data
       debug:
         var: select_result.stdout_lines
-        
+
     - name: Grant privileges to myapp user
       shell: |
         sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE myapp TO myapp;"
@@ -239,7 +237,7 @@
 
 - name: Test Web Application
   hosts: webservers
-  become: yes
+  become: 'yes'
   tasks:
     - name: Ensure Apache is restarted
       meta: flush_handlers
@@ -252,10 +250,10 @@
 
     - name: Fetch webpage content
       uri:
-        url: "http://localhost"
-        return_content: yes
+        url: http://localhost
+        return_content: 'yes'
       register: webpage
-      ignore_errors: yes
+      ignore_errors: 'yes'
 
     - name: Display webpage content
       debug:
