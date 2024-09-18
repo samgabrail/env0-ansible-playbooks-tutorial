@@ -220,16 +220,6 @@
       debug:
         var: select_result.stdout_lines
 
-    - name: Create a sample table
-      command: sudo -u postgres psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
-
-    - name: Insert sample data
-      command: >
-        sudo -u postgres psql -d myapp -c "
-        INSERT INTO items (name)
-        VALUES ('Computers'), ('iPads'), ('iPhones'), ('Android Phones')
-        ON CONFLICT (name) DO NOTHING;"
-
   handlers:
     - name: Reload PostgreSQL
       service:
