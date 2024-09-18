@@ -194,6 +194,35 @@
     - name: Create a sample table
       command: sudo -u postgres psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
 
+    - name: Add unique constraint to name column
+      command: >
+        sudo -u postgres psql -d myapp -c "
+        ALTER TABLE items ADD CONSTRAINT items_name_key UNIQUE (name);"
+      register: alter_table
+      changed_when: alter_table.rc == 0
+      failed_when: 
+        - alter_table.rc != 0
+        - "'already exists' not in alter_table.stderr"
+
+    - name: Insert sample data
+      command: >
+        sudo -u postgres psql -d myapp -c "
+        INSERT INTO items (name)
+        VALUES ('Computers'), ('iPads'), ('iPhones'), ('Android Phones')
+        ON CONFLICT (name) DO NOTHING;"
+
+    - name: Verify inserted data
+      command: sudo -u postgres psql -d myapp -c "SELECT * FROM items;"
+      register: select_result
+      changed_when: false
+
+    - name: Display inserted data
+      debug:
+        var: select_result.stdout_lines
+
+    - name: Create a sample table
+      command: sudo -u postgres psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
+
     - name: Insert sample data
       command: >
         sudo -u postgres psql -d myapp -c "
