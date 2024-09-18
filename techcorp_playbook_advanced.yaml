@@ -181,15 +181,24 @@
       when: user_exists.stdout == ""
 
     - name: Grant privileges to myapp user
-      shell: |
-        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE myapp TO myapp;"
-        sudo -u postgres psql -d myapp -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO myapp;"
-        sudo -u postgres psql -d myapp -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO myapp;"
-        sudo -u postgres psql -d myapp -c "ALTER TABLE IF EXISTS items OWNER TO myapp;"
-      args:
-        executable: /bin/bash
-      register: grant_privileges
-      changed_when: grant_privileges.rc == 0
+      become_user: postgres
+      postgresql_privs:
+        type: table
+        database: myapp
+        roles: myapp
+        privs: ALL
+        objs: items
+        state: present
+
+    - name: Grant schema privileges to myapp user
+      become_user: postgres
+      postgresql_privs:
+        type: schema
+        database: myapp
+        roles: myapp
+        privs: ALL
+        objs: public
+        state: present
 
     - name: Create a sample table
       command: sudo -u postgres psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
@@ -219,6 +228,17 @@
     - name: Display inserted data
       debug:
         var: select_result.stdout_lines
+
+    - name: Verify permissions
+      become_user: postgres
+      postgresql_query:
+        db: myapp
+        query: "SELECT grantee, privilege_type FROM information_schema.role_table_grants WHERE table_name='items' AND grantee='myapp';"
+      register: permission_check
+
+    - name: Display permission check results
+      debug:
+        var: permission_check.query_result
 
   handlers:
     - name: Reload PostgreSQL
