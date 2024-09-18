@@ -74,6 +74,18 @@
       notify:
         - Reload Apache
 
+    - name: Start Flask application
+      shell: nohup python3 /var/www/{{ domain }}/app.py > /var/www/{{ domain }}/flask.log 2>&1 &
+      args:
+        chdir: /var/www/{{ domain }}
+      become: yes
+      tags: start_flask
+
+    - name: Display webpage content
+      debug:
+        var: webpage.content
+      tags: test_flask
+
   handlers:
     - name: Reload Apache
       service:
