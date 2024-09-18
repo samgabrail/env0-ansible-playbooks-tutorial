@@ -34,6 +34,12 @@
         state: started
         enabled: true
 
+    - name: Create Apache configuration file for techcorp.com
+      template:
+        src: templates/apache_site.conf.j2
+        dest: /etc/apache2/sites-available/techcorp.com.conf
+      notify: Reload Apache
+
     - name: Enable Apache site
       command: a2ensite {{ domain }}.conf
       notify:
