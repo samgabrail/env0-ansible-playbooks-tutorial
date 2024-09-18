@@ -89,6 +89,16 @@
         name: apache2
         state: restarted
 
+    - name: Disable default Apache site
+      command: a2dissite 000-default.conf
+      notify: Reload Apache
+
+    - name: Remove default Apache site configuration
+      file:
+        path: /etc/apache2/sites-available/000-default.conf
+        state: absent
+      notify: Reload Apache
+
   handlers:
     - name: Reload Apache
       service:
@@ -111,8 +121,16 @@
         name: postgresql
         state: latest
 
-    - name: Ensure PostgreSQL is running
-      service:
+    - name: Ensure PostgreSQL is listening on all interfaces
+      lineinfile:
+        path: "/etc/postgresql/{{ postgresql_version }}/main/postgresql.conf"
+        regexp: '^listen_addresses\s*='
+        line: "listen_addresses = '*'"
+      notify: Restart PostgreSQL
+
+
+    - name: Ensure PostgreSQL is started and enabled
+      systemd:
         name: postgresql
         state: started
         enabled: yes
