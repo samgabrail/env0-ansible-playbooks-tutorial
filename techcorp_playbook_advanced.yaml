@@ -134,21 +134,11 @@
         line: "listen_addresses = '*'"
       notify: Restart PostgreSQL
 
-
     - name: Ensure PostgreSQL is started and enabled
       systemd:
         name: postgresql
         state: started
         enabled: yes
-
-    - name: Get PostgreSQL version
-      command: sudo -u postgres psql --version
-      register: psql_version
-      changed_when: false
-
-    - name: Set PostgreSQL version
-      set_fact:
-        postgresql_version: "{{ psql_version.stdout | regex_search('\\d+') }}"
 
     - name: Configure PostgreSQL
       template:
@@ -206,15 +196,6 @@
 
     - name: Insert sample data
       command: sudo -u postgres psql -d myapp -c "INSERT INTO items (name) SELECT 'Item ' || generate_series(1,3) WHERE NOT EXISTS (SELECT 1 FROM items);"
-
-    - name: Grant privileges to myapp user
-      become_user: postgres
-      community.postgresql.postgresql_query:
-        db: myapp
-        query: |
-          GRANT ALL PRIVILEGES ON DATABASE myapp TO myapp;
-          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO myapp;
-          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO myapp;
 
   handlers:
     - name: Reload PostgreSQL
