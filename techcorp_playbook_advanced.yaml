@@ -89,8 +89,14 @@
         name: apache2
         state: restarted
 
+    - name: Check if default Apache site exists
+      stat:
+        path: /etc/apache2/sites-enabled/000-default.conf
+      register: default_site
+
     - name: Disable default Apache site
       command: a2dissite 000-default.conf
+      when: default_site.stat.exists
       notify: Reload Apache
 
     - name: Remove default Apache site configuration
@@ -101,7 +107,7 @@
 
   handlers:
     - name: Reload Apache
-      service:
+      systemd:
         name: apache2
         state: reloaded
 
@@ -114,7 +120,7 @@
   hosts: dbservers
   become: yes  # Add this line to enable sudo for all tasks by default
   vars:
-    postgresql_version: "{{ postgresql_version | default('14') }}"
+    postgresql_version: 14
   tasks:
     - name: Install PostgreSQL
       apt:
