@@ -118,7 +118,7 @@
 
 - name: Configure Database Server
   hosts: dbservers
-  become: yes  # Add this line to enable sudo for all tasks by default
+  become: yes
   vars:
     postgresql_version: 14
   tasks:
@@ -190,9 +190,16 @@
       command: sudo -u postgres psql -c "CREATE USER myapp WITH PASSWORD 'myapppassword';"
       when: user_exists.stdout == ""
 
-    - name: Grant privileges to user
-      command: sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE myapp TO myapp;"
-      when: user_exists.stdout == ""
+    - name: Grant privileges to myapp user
+      shell: |
+        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE myapp TO myapp;"
+        sudo -u postgres psql -d myapp -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO myapp;"
+        sudo -u postgres psql -d myapp -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO myapp;"
+        sudo -u postgres psql -d myapp -c "ALTER TABLE IF EXISTS items OWNER TO myapp;"
+      args:
+        executable: /bin/bash
+      register: grant_privileges
+      changed_when: grant_privileges.rc == 0
 
     - name: Create a sample table
       command: sudo -u postgres psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
