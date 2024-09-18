@@ -86,6 +86,25 @@
         var: webpage.content
       tags: test_flask
 
+    - name: Create WSGI file
+      copy:
+        content: |
+          import sys
+          sys.path.insert(0, '/var/www/techcorp.com')
+          from app import app as application
+        dest: /var/www/techcorp.com/app.wsgi
+      notify: Restart Apache
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+
+    - name: Restart Flask application
+      shell: pkill python3 && nohup python3 /var/www/techcorp.com/app.py > /var/www/techcorp.com/flask.log 2>&1 &
+      args:
+        chdir: /var/www/techcorp.com
+
   handlers:
     - name: Reload Apache
       service:
