@@ -34,11 +34,6 @@
         state: started
         enabled: true
 
-    - name: Deploy Apache config file
-      template:
-        src: templates/apache.conf.j2
-        dest: /etc/apache2/sites-available/{{ domain }}.conf
-
     - name: Enable Apache site
       command: a2ensite {{ domain }}.conf
       notify:
@@ -74,18 +69,6 @@
       notify:
         - Reload Apache
 
-    - name: Start Flask application
-      shell: nohup python3 /var/www/{{ domain }}/app.py > /var/www/{{ domain }}/flask.log 2>&1 &
-      args:
-        chdir: /var/www/{{ domain }}
-      become: yes
-      tags: start_flask
-
-    - name: Display webpage content
-      debug:
-        var: webpage.content
-      tags: test_flask
-
     - name: Create WSGI file
       copy:
         content: |
@@ -95,15 +78,16 @@
         dest: /var/www/techcorp.com/app.wsgi
       notify: Restart Apache
 
+    - name: Enable WSGI module
+      apache2_module:
+        name: wsgi
+        state: present
+      notify: Restart Apache
+
     - name: Restart Apache
       service:
         name: apache2
         state: restarted
-
-    - name: Restart Flask application
-      shell: pkill python3 && nohup python3 /var/www/techcorp.com/app.py > /var/www/techcorp.com/flask.log 2>&1 &
-      args:
-        chdir: /var/www/techcorp.com
 
   handlers:
     - name: Reload Apache
@@ -202,3 +186,28 @@
       service:
         name: postgresql
         state: restarted
+
+- name: Test Web Application
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Ensure Apache is restarted
+      meta: flush_handlers
+
+    - name: Wait for Apache to start
+      wait_for:
+        port: 80
+        delay: 5
+        timeout: 30
+
+    - name: Fetch webpage content
+      uri:
+        url: "http://localhost"
+        return_content: yes
+      register: webpage
+      ignore_errors: yes
+
+    - name: Display webpage content
+      debug:
+        var: webpage.content
+      tags: test_flask
