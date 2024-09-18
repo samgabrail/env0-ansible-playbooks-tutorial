@@ -87,7 +87,6 @@
 
 - name: Configure Database Server
   hosts: dbservers
-  become: yes
   vars:
     postgresql_version: "{{ postgresql_version | default('14') }}"
   tasks:
@@ -141,6 +140,7 @@
         state: directory
         group: postgres
         mode: '0775'
+      become: yes
 
     - name: Check if database exists
       shell: sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='myapp'"
