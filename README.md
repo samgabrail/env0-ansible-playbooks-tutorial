@@ -14,4 +14,7 @@ This will create 4 VMs:
 
 To access the VMs, use `vagrant ssh controlnode`, `vagrant ssh webserver1`, `vagrant ssh webserver2`, and `vagrant ssh dbserver`
 
-To ssh into the VMs from the control node, use `ssh-copy-id -i ~/.ssh/id_rsa.pub vagrant@<ip>`
+## Run the playbook
+
+Run the playbook with `ansible-playbook -i inventory techcorp_playbook_advanced.yaml`
+

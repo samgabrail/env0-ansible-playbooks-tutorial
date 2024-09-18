@@ -87,6 +87,7 @@
 
 - name: Configure Database Server
   hosts: dbservers
+  become: yes  # Add this line to enable sudo for all tasks by default
   vars:
     postgresql_version: "{{ postgresql_version | default('14') }}"
   tasks:
@@ -94,19 +95,19 @@
       apt:
         name: postgresql
         state: latest
-      notify:
-        - Restart PostgreSQL
+      # No need for become: yes here as it's set at the play level
 
     - name: Ensure PostgreSQL is running
       service:
         name: postgresql
         state: started
-        enabled: true
+        enabled: yes
 
     - name: Get PostgreSQL version
       command: psql --version
       register: psql_version
       changed_when: false
+      become_user: postgres  # Run as postgres user
 
     - name: Set PostgreSQL version
       set_fact:
@@ -126,49 +127,6 @@
         regexp: '^vagrant ALL=\(postgres\) NOPASSWD: ALL'
         line: 'vagrant ALL=(postgres) NOPASSWD: ALL'
         validate: 'visudo -cf %s'
-      become: yes
-
-    - name: Add vagrant user to postgres group
-      user:
-        name: vagrant
-        groups: postgres
-        append: yes
-
-    - name: Ensure postgres group has necessary permissions
-      file:
-        path: /var/run/postgresql
-        state: directory
-        group: postgres
-        mode: '0775'
-      become: yes
-
-    - name: Check if database exists
-      shell: sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='myapp'"
-      register: db_exists
-      changed_when: false
-
-    - name: Create a new database
-      shell: sudo -u postgres createdb myapp
-      when: db_exists.stdout == ""
-
-    - name: Check if user exists
-      shell: sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='myapp'"
-      register: user_exists
-      changed_when: false
-
-    - name: Create a new PostgreSQL user
-      shell: sudo -u postgres psql -c "CREATE USER myapp WITH PASSWORD 'myapppassword';"
-      when: user_exists.stdout == ""
-
-    - name: Grant privileges to user
-      shell: sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE myapp TO myapp;"
-      when: user_exists.stdout == ""
-
-    - name: Create a sample table
-      shell: sudo -u postgres psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
-
-    - name: Insert sample data
-      shell: sudo -u postgres psql -d myapp -c "INSERT INTO items (name) SELECT 'Item ' || generate_series(1,3) WHERE NOT EXISTS (SELECT 1 FROM items);"
 
     - name: Ensure postgres group has necessary permissions
       file:
@@ -178,48 +136,39 @@
         mode: '0775'
 
     - name: Check if database exists
-      become: yes
       become_user: postgres
       command: psql -tAc "SELECT 1 FROM pg_database WHERE datname='myapp'"
       register: db_exists
       changed_when: false
 
     - name: Create a new database
-      become: yes
       become_user: postgres
       command: createdb myapp
       when: db_exists.stdout == ""
 
+    - name: Check if user exists
+      become_user: postgres
+      command: psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='myapp'"
+      register: user_exists
+      changed_when: false
+
     - name: Create a new PostgreSQL user
-      become: yes
       become_user: postgres
       command: psql -c "CREATE USER myapp WITH PASSWORD 'myapppassword';"
-      register: user_created
-      changed_when: "'CREATE ROLE' in user_created.stdout"
-      failed_when: 
-        - "'ERROR' in user_created.stderr"
-        - "'already exists' not in user_created.stderr"
+      when: user_exists.stdout == ""
 
     - name: Grant privileges to user
-      become: yes
       become_user: postgres
       command: psql -c "GRANT ALL PRIVILEGES ON DATABASE myapp TO myapp;"
-      when: user_created.changed
+      when: user_exists.stdout == ""
 
     - name: Create a sample table
-      become: yes
       become_user: postgres
       command: psql -d myapp -c "CREATE TABLE IF NOT EXISTS items (id serial primary key, name varchar(100));"
 
     - name: Insert sample data
-      become: yes
       become_user: postgres
-      command: psql -d myapp -c "INSERT INTO items (name) VALUES ('Item 1'), ('Item 2'), ('Item 3');"
-      register: insert_result
-      changed_when: "'INSERT 0 3' in insert_result.stdout"
-      failed_when:
-        - "'ERROR' in insert_result.stderr"
-        - "'duplicate key value violates unique constraint' not in insert_result.stderr"
+      command: psql -d myapp -c "INSERT INTO items (name) SELECT 'Item ' || generate_series(1,3) WHERE NOT EXISTS (SELECT 1 FROM items);"
 
   handlers:
     - name: Reload PostgreSQL
